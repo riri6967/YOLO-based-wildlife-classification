@@ -1,0 +1,110 @@
+{
+  "_note": "All numeric values are PLACEHOLDER ASSUMPTIONS for a reproducible baseline. Replace model profiles with values fitted by `python scripts/calibrate.py` on your own test-set predictions, and replace footprint factors with sourced values before reporting results.",
+  "survey": {"n_sites": 60, "n_days": 60, "occasion_days": 5, "burst_size": 3},
+  "seasons": {
+    "dry": {"rain_prob": 0.02, "veg_boost": 0.0, "activity_mult": 1.0, "empty_trigger_rate": 2.0},
+    "wet": {"rain_prob": 0.35, "veg_boost": 0.3, "activity_mult": 0.8, "empty_trigger_rate": 5.0}
+  },
+  "environment": {"veg_beta": [2.0, 2.0], "water_dist_gamma": [2.0, 1.5], "empty_veg_mult": 1.5, "empty_rain_mult": 1.0, "trigger_prob": {"large": 0.95, "medium": 0.85, "small": 0.65}, "trigger_night_penalty": 0.1},
+  "species": [
+    {"name": "elephant", "psi_logit": 0.4, "b_veg": -0.3, "b_water": -0.8, "rate": 0.3, "night_prop": 0.45, "size": "large", "n_train": 4000, "priority": true},
+    {"name": "buffalo", "psi_logit": -0.6, "b_veg": -0.5, "b_water": -0.6, "rate": 0.25, "night_prop": 0.4, "size": "large", "n_train": 1200, "priority": false},
+    {"name": "sable_antelope", "psi_logit": -0.2, "b_veg": 0.2, "b_water": -0.3, "rate": 0.2, "night_prop": 0.2, "size": "large", "n_train": 2500, "priority": false},
+    {"name": "waterbuck", "psi_logit": -0.4, "b_veg": -0.2, "b_water": -1.0, "rate": 0.2, "night_prop": 0.3, "size": "large", "n_train": 1500, "priority": false},
+    {"name": "warthog", "psi_logit": 0.3, "b_veg": -0.4, "b_water": -0.2, "rate": 0.35, "night_prop": 0.05, "size": "medium", "n_train": 3500, "priority": false},
+    {"name": "bushpig", "psi_logit": -0.3, "b_veg": 0.6, "b_water": -0.2, "rate": 0.2, "night_prop": 0.9, "size": "medium", "n_train": 900, "priority": false},
+    {"name": "baboon", "psi_logit": 0.8, "b_veg": 0.2, "b_water": -0.3, "rate": 0.5, "night_prop": 0.02, "size": "medium", "n_train": 5000, "priority": false},
+    {"name": "leopard", "psi_logit": -1.5, "b_veg": 0.7, "b_water": 0.0, "rate": 0.08, "night_prop": 0.75, "size": "medium", "n_train": 150, "priority": true},
+    {"name": "lion", "psi_logit": -2.2, "b_veg": -0.2, "b_water": -0.4, "rate": 0.06, "night_prop": 0.7, "size": "large", "n_train": 80, "priority": true},
+    {"name": "porcupine", "psi_logit": -0.5, "b_veg": 0.3, "b_water": 0.0, "rate": 0.15, "night_prop": 0.95, "size": "small", "n_train": 600, "priority": false},
+    {"name": "genet", "psi_logit": -0.2, "b_veg": 0.5, "b_water": 0.0, "rate": 0.18, "night_prop": 0.95, "size": "small", "n_train": 700, "priority": false}
+  ],
+  "models": {
+    "YOLOv4_reference": {
+      "recall_logit": 1.4,
+      "data_slope": 0.9,
+      "size_effect": {"large": 0.3, "medium": 0.0, "small": -0.6},
+      "night_penalty": 0.8,
+      "veg_penalty": 0.9,
+      "rain_penalty": 0.6,
+      "fp_per_empty": 0.02,
+      "fp_veg_mult": 1.5,
+      "misclass": 0.1,
+      "misclass_data_slope": -0.04,
+      "thr_recall_slope": 3.0,
+      "thr_fp_slope": 4.0,
+      "infer_ms": {"gpu": 25, "cpu": 400, "edge": 900},
+      "train_gpu_hours": 40
+    },
+    "YOLO11": {
+      "recall_logit": 1.9,
+      "data_slope": 0.8,
+      "size_effect": {"large": 0.3, "medium": 0.0, "small": -0.5},
+      "night_penalty": 0.7,
+      "veg_penalty": 0.8,
+      "rain_penalty": 0.5,
+      "fp_per_empty": 0.012,
+      "fp_veg_mult": 1.4,
+      "misclass": 0.08,
+      "misclass_data_slope": -0.035,
+      "thr_recall_slope": 3.0,
+      "thr_fp_slope": 4.0,
+      "infer_ms": {"gpu": 12, "cpu": 180, "edge": 450},
+      "train_gpu_hours": 30
+    },
+    "RT-DETR": {
+      "recall_logit": 2.0,
+      "data_slope": 0.7,
+      "size_effect": {"large": 0.3, "medium": 0.0, "small": -0.4},
+      "night_penalty": 0.7,
+      "veg_penalty": 0.6,
+      "rain_penalty": 0.5,
+      "fp_per_empty": 0.01,
+      "fp_veg_mult": 1.3,
+      "misclass": 0.07,
+      "misclass_data_slope": -0.03,
+      "thr_recall_slope": 3.0,
+      "thr_fp_slope": 4.0,
+      "infer_ms": {"gpu": 30, "cpu": 700, "edge": 2000},
+      "train_gpu_hours": 70
+    },
+    "MegaDetector+classifier": {
+      "recall_logit": 2.2,
+      "data_slope": 0.6,
+      "size_effect": {"large": 0.3, "medium": 0.0, "small": -0.3},
+      "night_penalty": 0.5,
+      "veg_penalty": 0.6,
+      "rain_penalty": 0.4,
+      "fp_per_empty": 0.006,
+      "fp_veg_mult": 1.2,
+      "misclass": 0.09,
+      "misclass_data_slope": -0.04,
+      "thr_recall_slope": 3.0,
+      "thr_fp_slope": 4.0,
+      "infer_ms": {"gpu": 45, "cpu": 1200, "edge": 3500},
+      "train_gpu_hours": 15
+    }
+  },
+  "monitoring_regimes": {
+    "sd_card_14d": {"check_interval_days": 14, "transmit_hours": 0.0, "processing_hours": 24.0, "response_hours": 6.0},
+    "sd_card_7d": {"check_interval_days": 7, "transmit_hours": 0.0, "processing_hours": 24.0, "response_hours": 6.0},
+    "cellular_realtime": {"check_interval_days": 0, "transmit_hours": 0.5, "processing_hours": 0.2, "response_hours": 6.0, "service_interval_days": 30}
+  },
+  "alert_deadline_hours": 24.0,
+  "alert_screening_catch": 0.7,
+  "true_alert_dispatch_frac": 0.15,
+  "footprint": {
+    "deployment": "gpu",
+    "device_watts": {"gpu": 300, "cpu": 65, "edge": 10},
+    "grid_kgco2_per_kwh": {"gpu": 0.4, "cpu": 0.4, "edge": 0.0},
+    "train_gpu_watts": 300,
+    "train_pue": 1.5,
+    "train_kgco2_per_kwh": 0.4,
+    "amortise_training_over_surveys": 10,
+    "vehicle_kgco2_per_km": 0.3,
+    "sd_check_route_km": 150,
+    "response_trip_km": 40,
+    "cellular_wh_per_image": 0.02,
+    "cellular_kgco2_per_kwh": 0.4
+  }
+}
