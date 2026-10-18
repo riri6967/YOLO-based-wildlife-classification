@@ -34,9 +34,10 @@ PROBLEM = {
         [0.0, 0.5], [1.0, 15.0], [0.0, 28.0], [1.0, 48.0], [20, 120],
     ],
 }
+PROBLEM["num_vars"] = len(PROBLEM["names"])
 
 OUTPUTS = ["mae_occ_mackenzie", "mae_occ_royle_link", "missed_event_frac",
-           "timely_response_frac", "false_alarms", "co2_total_kg"]
+           "median_latency_h", "false_alarms", "co2_total_kg"]
 
 
 def _one_run(cfg, x, base_model, rng):
