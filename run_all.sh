@@ -11,6 +11,7 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 unset PYTHONPATH || true   # keep ROS 2 Jazzy's Python packages out of this environment
+export PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True   # less fragmentation on small GPUs
 
 CONFIG=configs/pipeline.yaml
 FROM=""

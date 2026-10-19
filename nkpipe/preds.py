@@ -11,9 +11,12 @@ import pandas as pd
 from . import read_json, write_json
 
 
+TEST_SPLITS = ("test", "test_il")  # boxed test + independent image-level test
+
+
 def test_images(paths):
     man = pd.read_csv(paths.manifest)
-    return man[man.split == "test"].reset_index(drop=True)
+    return man[man.split.isin(TEST_SPLITS)].reset_index(drop=True)
 
 
 def save(paths, model, classes, dets, timing):

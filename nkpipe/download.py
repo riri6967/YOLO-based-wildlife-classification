@@ -17,7 +17,7 @@ import shutil
 import urllib.parse
 import urllib.request
 import zipfile
-from collections import defaultdict
+from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -133,31 +133,71 @@ def location_of(im):
     return str(im.get("location") or im["file_name"].replace("\\", "/").split("/")[0])
 
 
-def select_images(meta, dl, seed):
-    cats = {c["id"]: c["name"].lower() for c in meta["categories"]}
+def yolov4_seen_names(paths):
+    """Basenames of images the YOLOv4 reference was trained or validated on (Zenodo lists)."""
+    d = paths.models / "yolov4_reference"
+    seen = set()
+    for name in ("train.txt", "validation.txt"):
+        p = d / name
+        if p.exists():
+            seen |= {l.strip().replace("\\", "/").rsplit("/", 1)[-1] for l in open(p) if l.strip()}
+    return seen
+
+
+def select_images(meta, cfg, paths):
+    """Box-annotated images, a location-stratified sample of empty images, and an
+    independent image-level test sample (test sites only, never seen by YOLOv4).
+
+    The camera-site split is fixed here from the metadata and saved, so the
+    image-level test sample can be drawn from the test sites only."""
+    from .prepare import norm_name, split_locations  # local import: prepare imports this module
+
+    dl, pc = cfg["download"], cfg["prepare"]
+    cats = {c["id"]: norm_name(c["name"]) for c in meta["categories"]}
+    exclude = {norm_name(c) for c in pc["exclude_categories"]}
     by_img = defaultdict(list)
     for a in meta["annotations"]:
         by_img[a["image_id"]].append(a)
-    boxed, empty = [], defaultdict(list)
+    boxed, empty, imagelevel = [], defaultdict(list), []
     for im in meta["images"]:
         anns = by_img.get(im["id"], [])
+        names = {cats[a["category_id"]] for a in anns}
         if any(a.get("bbox") for a in anns):
             boxed.append(im)
-        elif anns and all(cats[a["category_id"]] == "empty" for a in anns):
+        elif names and names <= {"empty"}:
             empty[location_of(im)].append(im)
-    rng = random.Random(seed)
+        elif len(names) == 1 and not names & exclude:
+            imagelevel.append(im)
+    rng = random.Random(cfg["seed"])
     if dl.get("max_boxed_images"):
         rng.shuffle(boxed)
         boxed = boxed[: dl["max_boxed_images"]]
-    # Stratify empties by location, proportional to each location's share of empties.
+
+    # Camera-site split from the box-annotated images (dominant species per image).
+    dom = []
+    for im in boxed:
+        c = Counter(cats[a["category_id"]] for a in by_img[im["id"]] if a.get("bbox")).most_common(1)[0][0]
+        dom.append((location_of(im), c))
+    import pandas as pd
+    loc_counts = pd.crosstab(pd.Series([d[0] for d in dom], name="location"),
+                             pd.Series([d[1] for d in dom], name="label"))
+    assign = split_locations(loc_counts, pc["split_fractions"], pc["split_search_iters"], cfg["seed"])
+    write_json(assign, paths.raw / "split_assignment.json")
+
     n_total = sum(len(v) for v in empty.values())
     want = min(dl["n_empty_images"], n_total)
     chosen = []
     for loc, ims in empty.items():
         k = round(want * len(ims) / max(n_total, 1))
         chosen += rng.sample(ims, min(k, len(ims)))
-    log.info("selected %d box-annotated and %d empty images", len(boxed), len(chosen))
-    return boxed + chosen
+
+    seen = yolov4_seen_names(paths)
+    pool = [im for im in imagelevel if assign.get(location_of(im)) == "test"
+            and relative_name(im["file_name"], dl).rsplit("/", 1)[-1] not in seen]
+    il = rng.sample(pool, min(dl.get("n_imagelevel_test_images", 0), len(pool)))
+    log.info("selected %d box-annotated, %d empty and %d independent image-level test images "
+             "(YOLOv4 training list: %d images)", len(boxed), len(chosen), len(il), len(seen))
+    return boxed + chosen + il
 
 
 def relative_name(file_name, dl):
@@ -227,7 +267,7 @@ def main():
         download_yolov4(dl["yolov4_zenodo_record"], paths)
     if args.metadata_only:
         return
-    sel = select_images(meta, dl, cfg["seed"])
+    sel = select_images(meta, cfg, paths)
     write_json([im["id"] for im in sel], paths.raw / "selected_ids.json")
     log.info("approx. download size: %.1f GB", len(sel) * 0.7 / 1000)
     download_images(sel, dl, paths)

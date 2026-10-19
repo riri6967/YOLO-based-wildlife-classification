@@ -63,8 +63,9 @@ If YOLO11 or RT-DETR training is interrupted, resume it with
 
 **Settings in `configs/pipeline.yaml` you may want to change:**
 - `train.yolo11.imgsz` and `train.rtdetr.imgsz`: 960 by default, because
-  animals are often small in these frames. If you run out of GPU memory, use
-  640 or lower `batch`.
+  animals are often small in these frames. **On a laptop GPU (~6 GB), use
+  `--config configs/laptop.yaml`** (640 px, batch 4/2). If you still see
+  `CUDA out of memory`, halve that model's `batch` and rerun from that stage.
 - `train.*.epochs`: training stops early at `patience` once validation stops
   improving.
 - `simulate.energy_kgco2_per_kwh`: the grid carbon intensity of the country
@@ -109,11 +110,21 @@ If YOLO11 or RT-DETR training is interrupted, resume it with
 
 ## 7. Caveats to state in the paper
 
-1. **YOLOv4 reference leakage:** NWR_YOLO_v1 was trained on Nkhotakota
-   images, and its training split is not public, so some of our test images
-   may have been in its training set. Report it as an optimistic reference,
-   not a clean comparison. It also uses a different class list; unmatched
-   classes are listed in `work/preds/yolov4_class_mapping.json`.
+1. **YOLOv4 reference and leakage (handled):** NWR_YOLO_v1 was trained on almost all of
+   the box-annotated Nkhotakota images. The Zenodo record includes its `train.txt` and
+   `validation.txt`, so every image it saw is flagged (`yolov4_seen` in the manifest).
+   The pipeline therefore uses two test sets:
+   - **boxed test** (camera-site disjoint from our training data): mAP and box-level
+     metrics for YOLO11, RT-DETR and MegaDetector+classifier. YOLOv4's numbers here are
+     inflated, so report them only as a reference.
+   - **clean test**: every test image YOLOv4 never saw, including an *independent*
+     sample of species-labelled images without boxes from the test sites
+     (`download.n_imagelevel_test_images`). All image-level, condition, threshold and
+     ecology metrics, and the simulation calibration, use this set, so the comparison
+     of all four models is fair.
+
+   YOLOv4 also uses its own class list; unmatched classes are listed in
+   `work/preds/yolov4_class_mapping.json`.
 2. **The environmental covariates are automatic proxies.** Night/IR is
    reliable. Vegetation (green-pixel share per site) and poor visibility (low
    contrast or blur) are approximate; hand-label ~300 test images to validate

@@ -89,6 +89,11 @@ def main():
                     anns.append({"id": f"a{len(anns)}", "image_id": iid, "category_id": cid[s], "bbox": b})
     json.dump({"images": images, "categories": cats, "annotations": anns},
               open(meta_dir / "merged.json", "w"))
+    # Fake YOLOv4 training list (every third image) to exercise the leakage handling.
+    v4 = work / "models" / "yolov4_reference"
+    v4.mkdir(parents=True, exist_ok=True)
+    (v4 / "train.txt").write_text("".join(f"/export/images/{Path(im['file_name']).name}\n"
+                                          for im in images[::3]))
     print(f"synthetic dataset: {len(images)} images, {len(anns)} annotations in {work}")
 
 

@@ -26,7 +26,7 @@ NAME = "YOLOv4_reference"
 
 def find_files(d):
     def one(pat):
-        hits = sorted(d.rglob(pat))
+        hits = sorted(p for p in d.rglob(pat) if "__MACOSX" not in p.parts and not p.name.startswith("._"))
         return hits[0] if hits else None
     return one("*.cfg"), one("*.weights"), one("*.names") or one("*obj*.txt") or one("*classes*.txt")
 

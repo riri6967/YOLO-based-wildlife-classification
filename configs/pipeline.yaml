@@ -21,6 +21,9 @@ download:
     - https://storage.googleapis.com/public-datasets-lila/
   image_base_url: https://storage.googleapis.com/public-datasets-lila/nkhotakota-camera-traps/
   n_empty_images: 10000      # empty (false-trigger) images sampled for background training + FP evaluation
+  # Independent test set: species-labelled images WITHOUT boxes from the test camera sites,
+  # excluding every image the YOLOv4 reference was trained/validated on (fair for all models).
+  n_imagelevel_test_images: 5000
   max_boxed_images: null     # set e.g. 3000 for a quick trial run; null = all ~33.8k box-annotated images
   workers: 32
   yolov4_zenodo_record: 15994922   # NWR_YOLO_v1 (Appel et al. 2025), the reference model

@@ -1,18 +1,19 @@
 # Full run on a laptop GPU with ~6 GB memory (e.g. RTX 4050/3060 Laptop).
 #   bash run_all.sh --config configs/laptop.yaml
-# If training stops with "CUDA out of memory", halve the batch of that model.
+# Batches are sized for ~5.6 GB usable memory. If training still stops with
+# "CUDA out of memory", halve the batch of that model and rerun from that stage.
 _base: pipeline.yaml
 
 train:
   yolo11:
     weights: yolo11m.pt
     imgsz: 640
-    batch: 8
+    batch: 4
     workers: 4
   rtdetr:
     weights: rtdetr-l.pt
     imgsz: 640
-    batch: 4
+    batch: 2
     workers: 4
   classifier:
     batch: 32

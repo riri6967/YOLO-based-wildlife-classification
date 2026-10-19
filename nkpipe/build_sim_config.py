@@ -182,7 +182,10 @@ def main():
         if t.get("cpu_ms_per_image"):
             infer["cpu"] = float(t["cpu_ms_per_image"])
         te = train_energy.get(m, {})
-        prof = fit_profile(pd.read_csv(pi_path), spp, infer_ms=infer,
+        pi = pd.read_csv(pi_path)
+        if "yolov4_seen" in pi:
+            pi = pi[pi.yolov4_seen == 0]  # same clean test images for every model
+        prof = fit_profile(pi, spp, infer_ms=infer,
                            train_gpu_hours=te.get("gpu_hours") or old["train_gpu_hours"])
         prof["infer_kwh_per_image"] = t.get("kwh_per_image")
         prof["train_kwh"] = te.get("gpu_kwh")

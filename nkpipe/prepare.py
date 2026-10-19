@@ -24,7 +24,7 @@ import yaml
 from PIL import Image
 
 from . import cli, log, read_json, write_json
-from .download import location_of, relative_name
+from .download import location_of, relative_name, yolov4_seen_names
 from .envfeatures import _features_star
 
 SPLITS = ("train", "val", "test")
@@ -150,15 +150,17 @@ def main():
             if any(cats[a["category_id"]] in exclude for a in boxes):
                 continue
             label_counts = Counter(cats[a["category_id"]] for a in boxes)
-            label = label_counts.most_common(1)[0][0]
+            label, kind = label_counts.most_common(1)[0][0], "boxed"
         elif names and names <= {"empty"}:
-            label = "empty"
+            label, kind = "empty", "empty"
+        elif len(names) == 1 and not names & exclude:
+            label, kind = next(iter(names)), "imagelevel"  # independent test only (no boxes)
         else:
-            continue  # image-level-only labels: not usable for detection training
+            continue
         uid = uid_of(rel)
         rows.append({"uid": uid, "lila_id": iid, "rel": rel, "path": str(path),
                      "location": location_of(im), "meta_datetime": im.get("datetime"),
-                     "seq_id": im.get("seq_id"), "label": label, "n_boxes": len(boxes),
+                     "seq_id": im.get("seq_id"), "label": label, "kind": kind, "n_boxes": len(boxes),
                      "meta_w": im.get("width"), "meta_h": im.get("height")})
         for a in boxes:
             x, y, w, h = a["bbox"]
@@ -166,8 +168,10 @@ def main():
 
     man = pd.DataFrame(rows)
     bx = pd.DataFrame(box_rows, columns=["uid", "cls_name", "x", "y", "w", "h"])
-    log.info("usable images: %d (%d with boxes, %d empty)", len(man), (man.label != "empty").sum(),
-             (man.label == "empty").sum())
+    log.info("usable images: %d (%d with boxes, %d empty, %d image-level test)", len(man),
+             (man.kind == "boxed").sum(), (man.kind == "empty").sum(), (man.kind == "imagelevel").sum())
+    seen = yolov4_seen_names(paths)
+    man["yolov4_seen"] = man.rel.map(lambda r: int(r.rsplit("/", 1)[-1] in seen))
 
     # ---- environmental covariates from pixels / EXIF
     log.info("computing image covariates with %d workers ...", pc["workers"])
@@ -210,14 +214,19 @@ def main():
         log.info("dropping %d rare classes (%s) and their %d images", len(dropped), ", ".join(dropped), len(bad_uids))
         man = man[~man.uid.isin(bad_uids)].reset_index(drop=True)
         bx = bx[~bx.uid.isin(bad_uids)]
+    man = man[(man.kind != "imagelevel") | man.label.isin(keep)].reset_index(drop=True)
     cls_idx = {c: i for i, c in enumerate(keep)}
     bx["cls"] = bx.cls_name.map(cls_idx)
 
     # ---- split
-    animal = man[man.label != "empty"]
+    animal = man[man.kind == "boxed"]
     if pc["split_by"] == "location":
-        loc_counts = pd.crosstab(animal.location, animal.label)
-        assign = split_locations(loc_counts, pc["split_fractions"], pc["split_search_iters"], cfg["seed"])
+        saved = paths.raw / "split_assignment.json"
+        if saved.exists():  # fixed at download time (so the image-level test sample matches)
+            assign = read_json(saved)
+        else:
+            loc_counts = pd.crosstab(animal.location, animal.label)
+            assign = split_locations(loc_counts, pc["split_fractions"], pc["split_search_iters"], cfg["seed"])
         man["split"] = man.location.map(assign)
         # Sites with only empty images: spread them in proportion.
         rng = random.Random(cfg["seed"])
@@ -229,6 +238,10 @@ def main():
         rng = np.random.default_rng(cfg["seed"])
         f = pc["split_fractions"]
         man["split"] = rng.choice(list(SPLITS), size=len(man), p=[f[s] for s in SPLITS])
+
+    # Image-level images are an independent test set at the test sites only.
+    il = man.kind == "imagelevel"
+    man.loc[il, "split"] = np.where(man.loc[il, "split"] == "test", "test_il", "unused")
 
     # Limit background images in train.
     tr_empty = man[(man.split == "train") & (man.label == "empty")]
@@ -244,7 +257,7 @@ def main():
     # ---- write tables
     paths.data.mkdir(parents=True, exist_ok=True)
     cols = ["uid", "lila_id", "rel", "path", "location", "datetime", "hour", "month", "season", "seq_id",
-            "split", "label", "n_boxes", "width", "height", "ir", "night", "green_frac", "vegetation",
+            "split", "label", "kind", "yolov4_seen", "n_boxes", "width", "height", "ir", "night", "green_frac", "vegetation",
             "contrast", "sharpness", "poor_visibility"]
     man[cols].to_csv(paths.manifest, index=False)
     bx.merge(man[["uid", "split"]], on="uid").to_csv(paths.boxes, index=False)

@@ -1,5 +1,9 @@
 """Evaluate every model on the camera-site-disjoint test split with identical code.
 
+Test sets: "boxed" = box-annotated test split (mAP, box metrics); "clean" = every test
+image (boxed, empty, independent image-level) that the YOLOv4 reference never saw in
+training (image-level, condition, threshold and ecology metrics; fair to all models).
+
 Per model (results/eval/<model>/):
   metrics.json        COCO mAP, box- and image-level macro P/R/F1, empty filtering,
                       counts, richness and occupancy checks, speed and energy
@@ -112,7 +116,8 @@ def per_image_table(test, gt_by_uid, dets, names, thr):
         pred = names[top[4]] if top else "empty"
         score = top[5] if top else 0.0
         pred_count = sum(1 for x in d if top and x[4] == top[4] and x[5] >= thr)
-        rows.append({"uid": r.uid, "location": r.location, "datetime": r.datetime, "season": r.season,
+        rows.append({"uid": r.uid, "split": r.split, "yolov4_seen": int(getattr(r, "yolov4_seen", 0) or 0),
+                     "location": r.location, "datetime": r.datetime, "season": r.season,
                      "true_label": r.label, "pred_label": pred, "score": score,
                      "true_count": len(gt_by_uid.get(r.uid, [])), "pred_count": pred_count,
                      "night": int(r.night), "ir": r.ir, "vegetation": r.vegetation,
@@ -202,11 +207,18 @@ def evaluate_model(name, paths, ec, test, gt_by_uid, names, n_train):
     out_dir = paths.eval / name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    m_coco, ap50 = coco_map(paths, dets, k)
-    tp, fp, fn = box_counts(gt_by_uid, dets, thr, ec["iou"], k)
+    # Box-level metrics (mAP, box P/R/F1) use the box-annotated test split only.
+    boxed_uids = set(test[test.split == "test"].uid)
+    dets_box = {u: v for u, v in dets.items() if u in boxed_uids}
+    m_coco, ap50 = coco_map(paths, dets_box, k)
+    tp, fp, fn = box_counts(gt_by_uid, dets_box, thr, ec["iou"], k)
     bp, br, bf = prf(tp, fp, fn)
-    pi = per_image_table(test, gt_by_uid, dets, names, thr)
+    # Image-level and ecological metrics use the "clean" test images: boxed test, empty and
+    # independent image-level test images that the YOLOv4 reference never trained on.
+    pi_all = per_image_table(test, gt_by_uid, dets, names, thr)
+    pi = pi_all[pi_all.yolov4_seen == 0].reset_index(drop=True)
     m_img, sp_img, pred_eff = image_metrics(pi, thr, names)
+    m_boxed, _, _ = image_metrics(pi_all[pi_all.split == "test"], thr, names)
     m_eco, occ = ecology_checks(pi, thr)
 
     sp = pd.DataFrame({"species": names, "n_train_images": [n_train.get(c, 0) for c in names],
@@ -217,7 +229,10 @@ def evaluate_model(name, paths, ec, test, gt_by_uid, names, n_train):
                "box_macro_precision": float(np.nanmean(bp[has_gt])) if has_gt.any() else np.nan,
                "box_macro_recall": float(np.nanmean(br[has_gt])) if has_gt.any() else np.nan,
                "box_macro_f1": float(np.nan_to_num(bf[has_gt]).mean()) if has_gt.any() else np.nan,
-               **m_img, **m_eco, "timing": pr.get("timing", {})}
+               **m_img, **{f"boxedtest_{k_}": v for k_, v in m_boxed.items()}, **m_eco,
+               "n_clean_test_images": len(pi), "n_boxed_test_images": int((pi_all.split == "test").sum()),
+               "n_clean_imagelevel_images": int((pi.split == "test_il").sum()),
+               "timing": pr.get("timing", {})}
 
     sweep = []
     for t in ec["sweep"]:
@@ -229,7 +244,7 @@ def evaluate_model(name, paths, ec, test, gt_by_uid, names, n_train):
 
     write_json(metrics, out_dir / "metrics.json")
     sp.to_csv(out_dir / "per_species.csv", index=False)
-    pi.to_csv(out_dir / "per_image.csv", index=False)
+    pi_all.to_csv(out_dir / "per_image.csv", index=False)
     condition_table(pi, thr).to_csv(out_dir / "conditions.csv", index=False)
     pd.DataFrame(sweep).to_csv(out_dir / "threshold_sweep.csv", index=False)
     conf.to_csv(out_dir / "confusion.csv")
