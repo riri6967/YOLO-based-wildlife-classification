@@ -37,8 +37,14 @@ def _nll_mackenzie(theta, d, J, any_det):
 
 
 def mackenzie(y):
-    S, J = y.shape
-    d = y.sum(axis=1)
+    return mackenzie_counts(y.sum(axis=1), y.shape[1])
+
+
+def mackenzie_counts(d, J):
+    """MacKenzie fit from detections per site `d` and occasions surveyed `J`
+    (scalar, or one value per site when survey effort differs between sites)."""
+    d = np.asarray(d)
+    J = np.broadcast_to(np.asarray(J), d.shape)
     if d.sum() == 0:
         return {"psi": 0.0, "p": np.nan}
     best = None

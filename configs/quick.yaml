@@ -1,0 +1,26 @@
+# Trial run: checks the whole pipeline on your machine in roughly 1-2 hours
+# before committing to the full multi-day run. Results are NOT for the paper.
+_base: pipeline.yaml
+
+paths:
+  work: work_quick
+  results: results_quick
+
+download:
+  max_boxed_images: 3000
+  n_empty_images: 1000
+
+prepare:
+  split_search_iters: 200
+
+train:
+  yolo11: {weights: yolo11s.pt, epochs: 5, imgsz: 640, batch: 16, patience: 5}
+  rtdetr: {epochs: 3, imgsz: 640, batch: 8, patience: 3}
+  classifier: {epochs: 2}
+
+predict:
+  cpu_benchmark_images: 20
+
+simulate:
+  reps: 3
+  sobol_n_base: 16

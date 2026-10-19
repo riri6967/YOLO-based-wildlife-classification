@@ -3,3 +3,7 @@ __pycache__/
 results*/
 *.log
 .pytest_cache/
+work*/
+.venv*/
+*.pt
+runs/

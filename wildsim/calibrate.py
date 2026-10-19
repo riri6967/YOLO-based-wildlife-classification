@@ -85,7 +85,8 @@ def fit_profile(df, species_cfg, infer_ms=None, train_gpu_hours=None):
         "misclass": float(np.clip(mis_int, 0.0, 0.5)),
         "misclass_data_slope": float(mis_slope),
         "thr_recall_slope": float(thr_recall_slope),
-        "thr_fp_slope": float(np.log(fp_rate(0.25) / fp_rate(0.75)) / 0.5),
+        # Clipped: with very few false positives at 0.75 the ratio is unstable.
+        "thr_fp_slope": float(np.clip(np.log(fp_rate(0.25) / fp_rate(0.75)) / 0.5, 0.0, 20.0)),
         "infer_ms": infer_ms or {"gpu": np.nan, "cpu": np.nan, "edge": np.nan},
         "train_gpu_hours": train_gpu_hours,
     }

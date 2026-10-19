@@ -1,0 +1,100 @@
+# End-to-end pipeline configuration (download -> train -> evaluate -> simulate).
+# Paths are relative to the repository root unless absolute.
+
+paths:
+  work: work                 # raw data, prepared dataset, model runs, predictions (~40-60 GB)
+  results: results           # metrics, figures, calibrated simulation config
+
+seed: 42
+
+download:
+  # LILA's dataset index; the Nkhotakota row lists the metadata (COCO Camera Traps) URLs.
+  index_url: https://lila.science/public/lila_camera_trap_datasets_no_md5.csv
+  dataset_match: nkhotakota
+  # If auto-discovery fails, paste the metadata link(s) from
+  # https://lila.science/datasets/nkhotakota-camera-traps/ here (.json or .json.zip).
+  metadata_urls: []
+  relative_url_bases:
+    - https://lila.science/public/
+    - https://storage.googleapis.com/public-datasets-lila/
+  image_base_url: https://storage.googleapis.com/public-datasets-lila/nkhotakota-camera-traps/
+  n_empty_images: 10000      # empty (false-trigger) images sampled for background training + FP evaluation
+  max_boxed_images: null     # set e.g. 3000 for a quick trial run; null = all ~33.8k box-annotated images
+  workers: 32
+  yolov4_zenodo_record: 15994922   # NWR_YOLO_v1 (Appel et al. 2025), the reference model
+
+prepare:
+  min_images_per_class: 15   # classes with fewer box-annotated images are dropped (images removed)
+  exclude_categories: [empty, human, person, unknown, unidentified]
+  split_by: location         # location (camera-site disjoint, recommended) | image (random, leaky)
+  split_fractions: {train: 0.70, val: 0.15, test: 0.15}
+  split_search_iters: 500
+  train_empty_fraction: 0.10 # background images as a share of the train split
+  link_mode: symlink         # symlink | copy
+  night_hours: [18, 6]       # hour >= 18 or < 6 counts as night when a timestamp exists
+  ir_chroma_threshold: 4.0   # mean inter-channel difference below this -> greyscale IR image
+  poor_visibility_quantile: 0.10  # lowest-contrast/blur decile flagged (proxy for rain, fog, lens water)
+  crop_size: 256
+  crop_margin: 0.10
+  workers: 8
+
+train:
+  device: 0                  # GPU index, or "cpu"
+  yolo11:
+    weights: yolo11m.pt      # n/s/m/l/x; m is a good accuracy/cost trade-off on a 12-24 GB GPU
+    epochs: 100
+    imgsz: 960               # camera-trap animals are often small; use 640 if GPU memory is short
+    batch: 8
+    patience: 25
+    workers: 8
+  rtdetr:
+    weights: rtdetr-l.pt
+    epochs: 80
+    imgsz: 960
+    batch: 4
+    patience: 20
+    workers: 8
+  classifier:                # species classifier for the MegaDetector two-stage pipeline
+    arch: convnext_tiny.fb_in22k_ft_in1k
+    pretrained: true
+    img_size: 224
+    epochs: 20
+    batch: 64
+    lr: 0.0003
+    weight_decay: 0.05
+    label_smoothing: 0.1
+    balance_power: 0.5       # sampler weight = freq^-power (0 = none, 1 = fully balanced)
+    workers: 8
+
+megadetector:
+  # MegaDetector runs in its own virtualenv (setup/install_ubuntu.sh creates .venv-md)
+  python: .venv-md/bin/python
+  model: MDV5A
+  threshold: 0.01
+  extra_args: []
+  min_conf_for_classifier: 0.05
+  max_dets_per_image: 20
+
+predict:
+  conf: 0.01                 # keep low-confidence boxes so mAP and threshold sweeps are valid
+  iou: 0.6
+  batch: 16
+  cpu_benchmark_images: 100  # also time inference on CPU (for edge/offline deployment footprints)
+  yolov4:
+    enabled: true
+    name_map: {}             # optional {"yolov4 class name": "our class name"} for unmatched names
+
+evaluate:
+  threshold: 0.5
+  sweep: [0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9]
+  iou: 0.5
+  models: [YOLOv4_reference, YOLO11, RT-DETR, MegaDetector+classifier]
+
+simulate:
+  base_config: configs/default.json
+  priority_species_keywords: [elephant, lion, leopard, buffalo, hyena]
+  independence_minutes: 30   # records of a species at a site closer than this = one event
+  occasion_days: 7
+  reps: 20
+  sobol_n_base: 256
+  energy_kgco2_per_kwh: 0.40 # grid intensity where you TRAIN/RUN the models; set for your country

@@ -1,5 +1,10 @@
 # Detection uncertainty and environmental effects in automated wildlife monitoring
 
+> **To run the whole study (download → train → evaluate → simulate) on your
+> machine, see [PIPELINE.md](PIPELINE.md):** `bash setup/install_ubuntu.sh && bash run_all.sh`.
+> This README describes the simulation package (`wildsim/`); the data and model
+> pipeline lives in `nkpipe/`.
+
 Simulation framework for the Nkhotakota Wildlife Reserve (Malawi) camera-trap
 study. Appel et al. (2025, *Ecological Applications*, doi:10.1002/eap.70096)
 trained a YOLOv4 detector on this dataset. This project goes further:

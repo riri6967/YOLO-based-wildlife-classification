@@ -1,0 +1,26 @@
+# CPU smoke test on synthetic data (tests/smoke_pipeline.sh). Not for real results.
+_base: ../configs/pipeline.yaml
+
+paths:
+  work: work_smoke
+  results: results_smoke
+
+prepare:
+  min_images_per_class: 5
+  split_search_iters: 50
+  workers: 2
+
+train:
+  device: cpu
+  yolo11: {weights: yolo11n.pt, epochs: 1, imgsz: 320, batch: 8, patience: 1, workers: 0}
+  rtdetr: {weights: rtdetr-l.pt, epochs: 1, imgsz: 320, batch: 4, patience: 1, workers: 0}
+  classifier: {arch: resnet18, pretrained: false, epochs: 1, batch: 16, workers: 0, img_size: 96}
+
+predict:
+  batch: 4
+  cpu_benchmark_images: 3
+  yolov4: {enabled: false}
+
+simulate:
+  reps: 1
+  sobol_n_base: 4

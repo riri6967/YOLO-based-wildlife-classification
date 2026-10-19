@@ -15,11 +15,17 @@ def survey_footprint(cfg, model_name, n_images, alerts, regime_name):
     reg = cfg["monitoring_regimes"][regime_name]
     dep = fp["deployment"]
 
-    infer_kwh = n_images * prof["infer_ms"][dep] / 1000 * fp["device_watts"][dep] / 3.6e6
+    if dep == "gpu" and prof.get("infer_kwh_per_image") is not None:  # measured on real hardware
+        infer_kwh = n_images * prof["infer_kwh_per_image"]
+    else:
+        infer_kwh = n_images * prof["infer_ms"][dep] / 1000 * fp["device_watts"][dep] / 3.6e6
     infer_co2 = infer_kwh * fp["grid_kgco2_per_kwh"][dep]
 
-    train_kwh = (prof["train_gpu_hours"] * fp["train_gpu_watts"] * fp["train_pue"] / 1000
-                 / fp["amortise_training_over_surveys"])
+    if prof.get("train_kwh") is not None:
+        train_kwh = prof["train_kwh"] * fp["train_pue"] / fp["amortise_training_over_surveys"]
+    else:
+        train_kwh = (prof["train_gpu_hours"] * fp["train_gpu_watts"] * fp["train_pue"] / 1000
+                     / fp["amortise_training_over_surveys"])
     train_co2 = train_kwh * fp["train_kgco2_per_kwh"]
 
     km = alerts["n_checks"] * fp["sd_check_route_km"] + alerts["response_trips"] * fp["response_trip_km"]
