@@ -14,6 +14,8 @@ Expected CSV columns
   rain         optional, 1 if rain/fog/lens water is visible
 """
 
+import warnings
+
 import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
@@ -21,8 +23,13 @@ from scipy.special import expit, log_expit
 
 REF_THRESHOLD = 0.5
 
+# Plausible ranges; fits outside them come from too little data or complete separation.
+BOUNDS = {"recall_logit": (-6, 8), "data_slope": (-1, 4), "night_penalty": (-2, 5), "veg_penalty": (-2, 5),
+          "rain_penalty": (-2, 5), "fp_veg_mult": (0, 10), "misclass": (0, 0.5),
+          "misclass_data_slope": (-0.3, 0.3), "thr_recall_slope": (0, 20), "thr_fp_slope": (0, 20)}
 
-def _logistic(X, y, l2=1e-3, fixed_offset=None):
+
+def _logistic(X, y, l2=1.0, fixed_offset=None):
     off = np.zeros(len(y)) if fixed_offset is None else fixed_offset
 
     def nll(b):
@@ -73,7 +80,7 @@ def fit_profile(df, species_cfg, infer_ms=None, train_gpu_hours=None):
     else:
         fp0, fp_veg_mult = fp_rate(REF_THRESHOLD), 1.0
 
-    return {
+    prof = {
         "recall_logit": float(b[0]),
         "data_slope": float(b[1]),
         "size_effect": {"small": float(b[2]), "medium": 0.0, "large": float(b[3])},
@@ -90,6 +97,16 @@ def fit_profile(df, species_cfg, infer_ms=None, train_gpu_hours=None):
         "infer_ms": infer_ms or {"gpu": np.nan, "cpu": np.nan, "edge": np.nan},
         "train_gpu_hours": train_gpu_hours,
     }
+    clipped = []
+    for k, (lo, hi) in BOUNDS.items():
+        v = float(np.clip(prof[k], lo, hi))
+        if v != prof[k]:
+            clipped.append(f"{k}={prof[k]:.3g}")
+            prof[k] = v
+    if clipped:
+        warnings.warn("calibration values clipped to plausible range (too little data?): " + ", ".join(clipped))
+    prof["n_animal_images"], prof["n_empty_images"] = int(len(ani)), int(len(emp))
+    return prof
 
 
 def synthetic_predictions(prof, species_cfg, n=20000, empty_frac=0.4, seed=0):

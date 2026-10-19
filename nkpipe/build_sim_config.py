@@ -189,7 +189,7 @@ def main():
         prof["_source"] = {"fitted_from": str(pi_path), "train_energy_measured": bool(te),
                            "edge_ms_assumed": True}
         models[m] = prof
-        log.info("%s profile: recall_logit %.2f, night -%.2f, veg -%.2f, visibility -%.2f, fp/empty %.4f",
+        log.info("%s profile: recall_logit %.2f, penalties night %.2f veg %.2f visibility %.2f, fp/empty %.4f",
                  m, prof["recall_logit"], prof["night_penalty"], prof["veg_penalty"],
                  prof["rain_penalty"], prof["fp_per_empty"])
     if not models:
