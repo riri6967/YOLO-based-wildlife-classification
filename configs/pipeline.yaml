@@ -8,8 +8,10 @@ paths:
 seed: 42
 
 download:
-  # LILA's dataset index; the Nkhotakota row lists the metadata (COCO Camera Traps) URLs.
-  index_url: https://lila.science/public/lila_camera_trap_datasets_no_md5.csv
+  # LILA's dataset index (tried in order); the Nkhotakota row lists the metadata URLs.
+  index_urls:
+    - http://lila.science/wp-content/uploads/2023/06/lila_camera_trap_datasets.csv
+    - https://lila.science/public/lila_camera_trap_datasets_no_md5.csv
   dataset_match: nkhotakota
   # If auto-discovery fails, paste the metadata link(s) from
   # https://lila.science/datasets/nkhotakota-camera-traps/ here (.json or .json.zip).

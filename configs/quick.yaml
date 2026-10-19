@@ -1,6 +1,6 @@
 # Trial run: checks the whole pipeline on your machine in roughly 1-2 hours
 # before committing to the full multi-day run. Results are NOT for the paper.
-_base: pipeline.yaml
+_base: laptop.yaml   # sized for a ~6 GB laptop GPU
 
 paths:
   work: work_quick
@@ -15,7 +15,7 @@ prepare:
 
 train:
   yolo11: {weights: yolo11s.pt, epochs: 5, imgsz: 640, batch: 16, patience: 5}
-  rtdetr: {epochs: 3, imgsz: 640, batch: 8, patience: 3}
+  rtdetr: {epochs: 3, imgsz: 640, batch: 4, patience: 3}
   classifier: {epochs: 2}
 
 predict:

@@ -52,8 +52,17 @@ def fetch(url, dest=None, retries=3, timeout=120):
 def discover_metadata_urls(dl):
     if dl.get("metadata_urls"):
         return list(dl["metadata_urls"])
-    log.info("reading LILA index %s", dl["index_url"])
-    rows = list(csv.DictReader(io.StringIO(fetch(dl["index_url"]).decode("utf-8", "replace"))))
+    rows = None
+    for url in dl.get("index_urls") or [dl["index_url"]]:
+        try:
+            log.info("reading LILA index %s", url)
+            rows = list(csv.DictReader(io.StringIO(fetch(url).decode("utf-8", "replace"))))
+            break
+        except Exception as e:
+            log.warning("could not read %s (%s)", url, e)
+    if rows is None:
+        raise SystemExit("Could not read the LILA index. Open https://lila.science/datasets/nkhotakota-camera-traps/, "
+                         "copy the metadata link(s) and put them under download.metadata_urls in the config.")
     match = [r for r in rows if any(dl["dataset_match"] in str(v).lower() for v in r.values())]
     if not match:
         raise SystemExit("Dataset not found in LILA index; set download.metadata_urls in the config.")
