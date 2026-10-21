@@ -68,3 +68,17 @@ def test_image_metrics_and_ecology():
     eco, occ = ecology_checks(pi, 0.5)
     assert eco["n_test_sites"] == 2
     assert occ.set_index("species").loc["y", "pred_naive_occ"] == 0.0
+
+
+def test_yolov4_class_matching():
+    from nkpipe.predict_yolov4 import match_class
+    ours = ["african_savanna_elephant", "greater_kudu", "cape_buffalo", "southern_ground_hornbill",
+            "helmeted_guineafowl", "side_striped_jackal", "domestic_dog", "small_antelope", "yellow_baboon"]
+    assert match_class("elephant", ours, {}) == "african_savanna_elephant"
+    assert match_class("kudu", ours, {}) == "greater_kudu"
+    assert match_class("ground_hornbill", ours, {}) == "southern_ground_hornbill"
+    assert match_class("guinea_fowl", ours, {}) == "helmeted_guineafowl"
+    assert match_class("side-striped_jackal", ours, {}) == "side_striped_jackal"
+    assert match_class("dog", ours, {}) == "domestic_dog"
+    assert match_class("duiker", ours, {}) is None
+    assert match_class("duiker", ours, {"duiker": "small_antelope"}) == "small_antelope"

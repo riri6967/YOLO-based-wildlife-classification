@@ -1,13 +1,12 @@
 """Run the published NWR_YOLO_v1 (YOLOv4, Appel et al. 2025) on the test split.
 
-Uses OpenCV's Darknet loader, so no Darknet build is needed. Class names are
-matched to this study's classes after normalisation; set
-predict.yolov4.name_map for any that do not match. Detections of unmatched
-classes are dropped.
+Uses OpenCV 4's Darknet loader (OpenCV 5 removed it), so no Darknet build is
+needed. YOLOv4's short class names (e.g. "kudu") are matched to this study's
+LILA names (e.g. "greater_kudu") automatically; set predict.yolov4.name_map
+for any that remain unmatched. Detections of unmatched classes are dropped.
 
-CAUTION: this model was trained on Nkhotakota images whose split is not
-known, so some of our test images may have been in its training data. Its
-scores are therefore an optimistic reference, not a clean comparison.
+Its training/validation images are listed on Zenodo; the evaluation scores
+every model on test images YOLOv4 never saw (see nkpipe.evaluate).
 
     python -m nkpipe.download --yolov4 --metadata-only   # fetch the model
     python -m nkpipe.predict_yolov4
@@ -24,6 +23,18 @@ from .prepare import norm_name
 from . import preds as P
 
 NAME = "YOLOv4_reference"
+
+
+def match_class(v4_name, ours, user_map):
+    """Map one YOLOv4 class name to ours: user map, exact name, then a unique
+    name whose words contain all of YOLOv4's words ("kudu" -> "greater_kudu")."""
+    n = norm_name(v4_name)
+    n = norm_name(user_map.get(n, n))
+    if n in ours:
+        return n
+    words = set(n.split("_"))
+    cands = [c for c in ours if words <= set(c.split("_")) or n.replace("_", "") in c.replace("_", "")]
+    return cands[0] if len(cands) == 1 else None
 
 
 def find_files(d):
@@ -62,14 +73,17 @@ def main():
     user_map = {norm_name(k): norm_name(v) for k, v in cfg["predict"]["yolov4"]["name_map"].items()}
     mapping = {}
     for j, n in enumerate(v4_names):
-        nn_ = user_map.get(norm_name(n), norm_name(n))
-        if nn_ in idx:
-            mapping[j] = idx[nn_]
+        m = match_class(n, ours, user_map)
+        if m is not None:
+            mapping[j] = idx[m]
     unmatched = [n for j, n in enumerate(v4_names) if j not in mapping]
     log.info("YOLOv4 classes matched: %d/%d; unmatched: %s", len(mapping), len(v4_names), unmatched)
     write_json({"mapping": {v4_names[j]: ours[i] for j, i in mapping.items()}, "unmatched": unmatched},
                paths.preds / "yolov4_class_mapping.json")
 
+    if not hasattr(cv2.dnn, "readNetFromDarknet"):
+        raise SystemExit(f"OpenCV {cv2.__version__} cannot load Darknet models (removed in OpenCV 5). "
+                         "Install OpenCV 4:  .venv/bin/pip install 'opencv-python<5'")
     net = cv2.dnn.readNetFromDarknet(str(cfg_p), str(w_p))
     use_cuda = cv2.cuda.getCudaEnabledDeviceCount() > 0 if hasattr(cv2, "cuda") else False
     if use_cuda:
