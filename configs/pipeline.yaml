@@ -88,7 +88,15 @@ predict:
   cpu_benchmark_images: 100  # also time inference on CPU (for edge/offline deployment footprints)
   yolov4:
     enabled: true
-    name_map: {}             # optional {"yolov4 class name": "our class name"} for unmatched names
+    # YOLOv4 name -> LILA name where automatic matching cannot tell. LILA groups the small
+    # antelopes into one class, so the three small-antelope species map to it (edit if needed).
+    name_map:
+      bushbaby: galago
+      bush_squirrel: squirrel
+      other_bird: bird
+      duiker: small_antelope
+      grysbok: small_antelope
+      klipspringer: small_antelope
 
 evaluate:
   threshold: 0.5
