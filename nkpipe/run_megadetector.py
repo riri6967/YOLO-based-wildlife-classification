@@ -9,15 +9,22 @@ list, calls MegaDetector's batch runner in that environment, and measures GPU en
 
 import subprocess
 
-from . import ROOT, cli, log, write_json
+from . import ROOT, cli, log, read_json, write_json
 from .energy import EnergyMeter
 from . import preds as P
 
 
 def main():
-    args, cfg, paths = cli(__doc__)
+    args, cfg, paths = cli(__doc__, lambda ap: ap.add_argument(
+        "--force", action="store_true", help="run again even if results exist"))
     mc = cfg["megadetector"]
     test = P.test_images(paths)
+    done = paths.energy / "MegaDetector_infer.json"
+    if done.exists() and (paths.preds / "megadetector_raw.json").exists() and not args.force:
+        if read_json(done).get("n_images") == len(test):
+            log.info("MegaDetector results already exist for %d test images; skipping (--force to rerun).",
+                     len(test))
+            return
     img_list = paths.preds / "md_input.json"
     write_json([str(p) for p in test.path], img_list)
     out = paths.preds / "megadetector_raw.json"

@@ -82,3 +82,18 @@ def test_yolov4_class_matching():
     assert match_class("dog", ours, {}) == "domestic_dog"
     assert match_class("duiker", ours, {}) is None
     assert match_class("duiker", ours, {"duiker": "small_antelope"}) == "small_antelope"
+
+
+def test_energy_meter_continues_after_interruption(tmp_path):
+    import json
+    import time
+    from nkpipe.energy import EnergyMeter
+    ck = tmp_path / "e.json"
+    with EnergyMeter(checkpoint=ck, flush_every=0.05, interval=0.01):
+        time.sleep(0.2)          # session 1 is "killed": only the periodic checkpoint survives
+    first = json.loads(ck.read_text())
+    assert first["partial"] and first["wall_s"] > 0
+    with EnergyMeter(checkpoint=ck) as em:
+        time.sleep(0.05)
+    s = em.save(ck)
+    assert s["sessions"] == 2 and s["wall_s"] > first["wall_s"] and "partial" not in s

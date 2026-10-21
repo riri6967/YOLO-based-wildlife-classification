@@ -52,7 +52,11 @@ def macro_f1(y, p, k):
 
 
 def main():
-    args, cfg, paths = cli(__doc__)
+    args, cfg, paths = cli(__doc__, lambda ap: ap.add_argument(
+        "--force", action="store_true", help="train again even if a trained classifier exists"))
+    if (paths.models / "classifier.json").exists() and not args.force:
+        log.info("species classifier already trained; skipping. Use --force to retrain.")
+        return
     cc = cfg["train"]["classifier"]
     names = load_classes(paths)
     k = len(names)

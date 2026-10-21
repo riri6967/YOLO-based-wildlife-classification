@@ -58,8 +58,11 @@ sudo apt install tmux && tmux new -s wildlife
 bash run_all.sh
 # detach: Ctrl-b d      reattach: tmux attach -t wildlife
 ```
-If YOLO11 or RT-DETR training is interrupted, resume it with
-`.venv/bin/python -m nkpipe.train_ultralytics --model yolo11 --resume`.
+**Interruptions are safe** (reboot, switching to Windows, power cut): just run the
+same command again. Finished stages are skipped, downloads continue, and YOLO11 /
+RT-DETR training resumes from the last completed epoch, with energy added up
+across sessions. To redo a stage from scratch, run it directly with `--force`,
+e.g. `.venv/bin/python -m nkpipe.train_ultralytics --config configs/laptop.yaml --model yolo11 --force`.
 
 **Settings in `configs/pipeline.yaml` you may want to change:**
 - `train.yolo11.imgsz` and `train.rtdetr.imgsz`: 960 by default, because

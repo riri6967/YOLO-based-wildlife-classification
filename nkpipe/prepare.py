@@ -121,7 +121,12 @@ def _crop_job(args):
 # --------------------------------------------------------------------------- main
 
 def main():
-    args, cfg, paths = cli(__doc__)
+    args, cfg, paths = cli(__doc__, lambda ap: ap.add_argument(
+        "--force", action="store_true", help="rebuild the dataset even if it was already prepared"))
+    if (paths.data / ".complete").exists() and not args.force:
+        log.info("dataset already prepared in %s; skipping. Use --force to rebuild.", paths.data)
+        return
+    (paths.data / ".complete").unlink(missing_ok=True)
     pc, dl = cfg["prepare"], cfg["download"]
     meta = read_json(paths.metadata / "merged.json")
     cats = {c["id"]: norm_name(c["name"]) for c in meta["categories"]}
@@ -314,6 +319,7 @@ def main():
     log.info("writing classifier crops for %d images ...", len(jobs))
     with Pool(pc["workers"]) as pool:
         n = sum(pool.map(_crop_job, jobs, chunksize=16))
+    (paths.data / ".complete").touch()
     log.info("prepared: %d classes, %d crops, data.yaml at %s", len(keep), n, paths.yolo / "data.yaml")
 
 
