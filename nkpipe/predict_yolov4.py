@@ -13,6 +13,8 @@ scores are therefore an optimistic reference, not a clean comparison.
     python -m nkpipe.predict_yolov4
 """
 
+import time
+
 import cv2
 import numpy as np
 
@@ -81,6 +83,8 @@ def main():
     pc = cfg["predict"]
     test = P.test_images(paths)
     dets = {}
+    log.info("YOLOv4: running on %d test images (%s)", len(test), "GPU" if use_cuda else "CPU, slow")
+    t0 = time.time()
     with EnergyMeter(device_index=None if not use_cuda else str(cfg["train"]["device"])) as em:
         for i, r in enumerate(test.itertuples(), 1):
             img = cv2.imread(r.path)
@@ -93,8 +97,8 @@ def main():
             boxes = np.asarray(boxes).reshape(-1, 4)
             dets[r.uid] = [[float(b[0]), float(b[1]), float(b[2]), float(b[3]), mapping[c], float(s)]
                            for c, s, b in zip(classes, scores, boxes) if c in mapping]
-            if i % 1000 == 0:
-                log.info("YOLOv4: %d/%d", i, len(test))
+            if i % 100 == 0:
+                log.info("YOLOv4: %d/%d images (%.1f s/image)", i, len(test), (time.time() - t0) / i)
     timing = P.timing_from_energy(em.summary(), len(test))
     timing["device"] = "cuda" if use_cuda else "cpu"
     if not use_cuda:

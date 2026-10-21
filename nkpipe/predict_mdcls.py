@@ -44,7 +44,9 @@ def main():
     test = P.test_images(paths)
     dets = {}
     with EnergyMeter(device_index=None if dev.type == "cpu" else str(cfg["train"]["device"])) as em:
-        for r in test.itertuples():
+        for i, r in enumerate(test.itertuples(), 1):
+            if i % 200 == 0:
+                log.info("classified crops for %d/%d images", i, len(test))
             im = by_path.get(r.path) or by_path.get(str(r.path))
             dets[r.uid] = []
             if not im or not im.get("detections"):
