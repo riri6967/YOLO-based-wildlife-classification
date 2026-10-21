@@ -26,26 +26,55 @@ from . import cli, log, read_json, write_json
 UA = {"User-Agent": "nkpipe/1.0 (camera-trap research)"}
 
 
-def fetch(url, dest=None, retries=3, timeout=120):
+def fetch(url, dest=None, retries=3, timeout=60, progress=False):
+    """Download `url` (to memory, or to `dest`). File downloads resume from a
+    partial `.part` file after a dropped connection instead of starting over."""
+    import time
     last = None
-    for _ in range(retries):
+    for attempt in range(retries):
         try:
-            req = urllib.request.Request(url, headers=UA)
+            headers = dict(UA)
+            tmp = Path(str(dest) + ".part") if dest is not None else None
+            have = tmp.stat().st_size if tmp is not None and tmp.exists() else 0
+            if have:
+                headers["Range"] = f"bytes={have}-"
+            req = urllib.request.Request(url, headers=headers)
             with urllib.request.urlopen(req, timeout=timeout) as r:
                 if dest is None:
                     return r.read()
-                tmp = Path(str(dest) + ".part")
                 tmp.parent.mkdir(parents=True, exist_ok=True)
-                with open(tmp, "wb") as f:
-                    shutil.copyfileobj(r, f, length=1 << 20)
+                if have and r.status != 206:  # server ignored Range: start over
+                    have = 0
+                total = int(r.headers.get("Content-Length") or 0) + have
+                done, next_log = have, have + (50 << 20)
+                with open(tmp, "ab" if have else "wb") as f:
+                    while True:
+                        chunk = r.read(1 << 20)
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        done += len(chunk)
+                        if progress and done >= next_log:
+                            log.info("  %s: %.0f / %.0f MB", Path(dest).name, done / 1e6, total / 1e6)
+                            next_log += 50 << 20
+                if total and done < total:
+                    raise IOError(f"incomplete download ({done} of {total} bytes)")
                 tmp.rename(dest)
                 return dest
         except urllib.error.HTTPError as e:
             if e.code == 404:
                 raise
+            if e.code == 416 and tmp is not None and tmp.exists():
+                tmp.rename(dest)  # Range starts past the end: the .part file is already complete
+                return dest
             last = e
-        except Exception as e:  # network hiccup: retry
+        except Exception as e:  # network hiccup: retry (and resume)
             last = e
+        if attempt == retries - 1:
+            break
+        if progress:
+            log.warning("  download interrupted (%s); resuming (attempt %d/%d)", last, attempt + 2, retries)
+        time.sleep(min(2 ** attempt, 30))
     raise last
 
 
@@ -248,7 +277,7 @@ def download_yolov4(record, paths):
         out = dest / name
         if not out.exists():
             log.info("zenodo: %s (%.1f MB)", name, f.get("size", 0) / 1e6)
-            fetch(f["links"]["self"], out, timeout=600)
+            fetch(f["links"]["self"], out, retries=20, progress=True)
         if name.lower().endswith(".zip"):
             with zipfile.ZipFile(out) as z:
                 z.extractall(dest)
