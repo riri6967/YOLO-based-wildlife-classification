@@ -5,6 +5,9 @@ paths:
   work: work_smoke
   results: results_smoke
 
+download:
+  yolov4_dir: work_smoke/models/yolov4_reference   # fake list written by make_synthetic_lila.py
+
 prepare:
   min_images_per_class: 5
   split_search_iters: 50

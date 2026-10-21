@@ -27,6 +27,7 @@ download:
   max_boxed_images: null     # set e.g. 3000 for a quick trial run; null = all ~33.8k box-annotated images
   workers: 32
   yolov4_zenodo_record: 15994922   # NWR_YOLO_v1 (Appel et al. 2025), the reference model
+  yolov4_dir: external/yolov4_reference   # shared by all configs, downloaded once
 
 prepare:
   min_images_per_class: 15   # classes with fewer box-annotated images are dropped (images removed)

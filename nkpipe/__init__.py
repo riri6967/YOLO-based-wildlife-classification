@@ -38,6 +38,8 @@ class Paths:
         self.preds = self.work / "preds"
         self.energy = self.work / "energy"
         self.eval = self.results / "eval"
+        # Shared by every config (trial and full runs), so the Zenodo model is fetched once.
+        self.yolov4 = _abs(cfg.get("download", {}).get("yolov4_dir", "external/yolov4_reference"))
 
     def mkdirs(self):
         for p in (self.metadata, self.images, self.data, self.runs, self.models,

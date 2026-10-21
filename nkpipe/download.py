@@ -46,7 +46,7 @@ def fetch(url, dest=None, retries=3, timeout=60, progress=False):
                 if have and r.status != 206:  # server ignored Range: start over
                     have = 0
                 total = int(r.headers.get("Content-Length") or 0) + have
-                done, next_log = have, have + (50 << 20)
+                done, next_log, t0 = have, have + (10 << 20), time.time()
                 with open(tmp, "ab" if have else "wb") as f:
                     while True:
                         chunk = r.read(1 << 20)
@@ -55,8 +55,9 @@ def fetch(url, dest=None, retries=3, timeout=60, progress=False):
                         f.write(chunk)
                         done += len(chunk)
                         if progress and done >= next_log:
-                            log.info("  %s: %.0f / %.0f MB", Path(dest).name, done / 1e6, total / 1e6)
-                            next_log += 50 << 20
+                            log.info("  %s: %.0f / %.0f MB (%.2f MB/s)", Path(dest).name, done / 1e6,
+                                     total / 1e6, (done - have) / 1e6 / max(time.time() - t0, 1e-3))
+                            next_log += 10 << 20
                 if total and done < total:
                     raise IOError(f"incomplete download ({done} of {total} bytes)")
                 tmp.rename(dest)
@@ -164,7 +165,7 @@ def location_of(im):
 
 def yolov4_seen_names(paths):
     """Basenames of images the YOLOv4 reference was trained or validated on (Zenodo lists)."""
-    d = paths.models / "yolov4_reference"
+    d = paths.yolov4
     seen = set()
     for name in ("train.txt", "validation.txt"):
         p = d / name
@@ -269,8 +270,11 @@ def download_images(images, dl, paths):
 
 
 def download_yolov4(record, paths):
-    dest = paths.models / "yolov4_reference"
+    dest = paths.yolov4
     dest.mkdir(parents=True, exist_ok=True)
+    if (dest / ".complete").exists():
+        log.info("YOLOv4 reference already in %s", dest)
+        return
     info = json.loads(fetch(f"https://zenodo.org/api/records/{record}"))
     for f in info["files"]:
         name = f["key"]
@@ -281,6 +285,7 @@ def download_yolov4(record, paths):
         if name.lower().endswith(".zip"):
             with zipfile.ZipFile(out) as z:
                 z.extractall(dest)
+    (dest / ".complete").touch()
     log.info("YOLOv4 reference files in %s", dest)
 
 
@@ -293,7 +298,11 @@ def main():
     log.info("metadata: %d images, %d annotations, %d categories",
              len(meta["images"]), len(meta["annotations"]), len(meta["categories"]))
     if args.yolov4:
-        download_yolov4(dl["yolov4_zenodo_record"], paths)
+        try:
+            download_yolov4(dl["yolov4_zenodo_record"], paths)
+        except Exception as e:  # the reference model is optional; keep going without it
+            log.warning("YOLOv4 reference download failed (%s). Continuing without it; rerun the "
+                        "download stage later to fetch it (it resumes where it stopped).", e)
     if args.metadata_only:
         return
     sel = select_images(meta, cfg, paths)

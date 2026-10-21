@@ -49,7 +49,7 @@ def main():
     if not cfg["predict"]["yolov4"]["enabled"]:
         log.info("YOLOv4 reference disabled in config")
         return
-    d = paths.models / "yolov4_reference"
+    d = paths.yolov4
     cfg_p, w_p, names_p = find_files(d) if d.exists() else (None, None, None)
     if not (cfg_p and w_p and names_p):
         raise SystemExit(f"YOLOv4 .cfg/.weights/.names not found in {d}; run download with --yolov4 "

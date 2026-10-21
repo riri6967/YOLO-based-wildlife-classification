@@ -90,7 +90,7 @@ def main():
     json.dump({"images": images, "categories": cats, "annotations": anns},
               open(meta_dir / "merged.json", "w"))
     # Fake YOLOv4 training list (every third image) to exercise the leakage handling.
-    v4 = work / "models" / "yolov4_reference"
+    v4 = work / "models" / "yolov4_reference"  # = download.yolov4_dir in tests/smoke.yaml
     v4.mkdir(parents=True, exist_ok=True)
     (v4 / "train.txt").write_text("".join(f"/export/images/{Path(im['file_name']).name}\n"
                                           for im in images[::3]))
