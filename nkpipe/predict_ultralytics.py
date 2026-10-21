@@ -13,11 +13,15 @@ from . import preds as P
 
 def run(model, paths_list, imgsz, pc, device):
     dets, speed = {}, []
-    for i in range(0, len(paths_list), 256):
-        chunk = paths_list[i:i + 256]
+    # Ultralytics runs a Python list of images as ONE batch, so feed lists of `batch` images.
+    bs = max(int(pc["batch"]), 1)
+    for i in range(0, len(paths_list), bs):
+        chunk = paths_list[i:i + bs]
+        if i and i % 1000 < bs:
+            log.info("predicted %d/%d images", i, len(paths_list))
         for uid, r in zip([u for u, _ in chunk], model.predict(
                 [p for _, p in chunk], imgsz=imgsz, conf=pc["conf"], iou=pc["iou"], device=device,
-                batch=pc["batch"], stream=True, verbose=False)):
+                verbose=False)):
             b = r.boxes
             xyxy = b.xyxy.cpu().numpy()
             dets[uid] = [[float(x1), float(y1), float(x2 - x1), float(y2 - y1), int(c), float(s)]
